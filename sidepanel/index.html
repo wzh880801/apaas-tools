@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aPaaS Tools</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>aPaaS Tools</h1>
+  </header>
+
+  <nav class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="page">当前页面</button>
+    <button class="tab-btn" data-tab="objects">对象合并复制</button>
+    <button class="tab-btn" data-tab="settings">设置</button>
+  </nav>
+
+  <main class="main">
+    <!-- Tab: 当前页面 -->
+    <section class="tab-panel active" data-panel="page">
+      <div class="card">
+        <h2>认证信息</h2>
+        <p>自动采集当前页面的 <code>x-kunlun-token</code> 和 <code>cookie</code>。</p>
+        <div class="auth-row">
+          <span class="auth-label">Token</span>
+          <button class="btn btn-sm" data-copy="token">复制</button>
+        </div>
+        <div id="authToken" class="info info-mono"></div>
+
+        <div class="auth-row">
+          <span class="auth-label">Cookie</span>
+          <button class="btn btn-sm" data-copy="cookie">复制</button>
+        </div>
+        <div id="authCookie" class="info info-mono"></div>
+
+        <button id="refreshAuth" class="btn">刷新认证信息</button>
+      </div>
+
+      <div class="card">
+        <h2>页面信息</h2>
+        <p>获取当前活动标签页的基础信息。</p>
+        <button id="getTabInfo" class="btn">获取当前标签页信息</button>
+        <div id="tabInfo" class="info"></div>
+      </div>
+    </section>
+
+    <!-- Tab: 对象合并复制 -->
+    <section class="tab-panel" data-panel="objects">
+      <div class="card">
+        <h2>对象合并复制</h2>
+        <p>从当前页面自动识别 namespace，拉取对象列表，选择 2 个及以上对象合并复制为新对象。</p>
+        <div class="safe-notice">
+          <strong>安全提示：</strong>该操作仅会基于选中的对象生成一个新对象，<strong>不会影响或修改任何已有对象</strong>。
+        </div>
+        <div class="object-meta">
+          <span>Namespace: <code id="objectNamespace">-</code></span>
+          <span>Lane: <code id="objectLane">-</code></span>
+        </div>
+        <div class="object-actions">
+          <button id="loadObjects" class="btn">加载对象列表</button>
+          <button id="mergeCreateObject" class="btn" disabled>合并为新对象</button>
+        </div>
+        <input id="objectFilter" class="filter-input" type="text" placeholder="搜索 label 或 api_alias..." />
+        <div class="object-toolbar">
+          <label class="object-check-all">
+            <input id="selectAllObjects" type="checkbox" />
+            <span>全选</span>
+          </label>
+          <span id="objectCount" class="object-count">0 个对象</span>
+        </div>
+        <ul id="objectList" class="object-list"></ul>
+
+        <div id="actionResult" class="export-result hidden">
+          <div class="export-result-header">
+            <span id="actionResultText">-</span>
+          </div>
+        </div>
+
+        <div id="debugPanel" class="debug-panel hidden">
+          <h3>调试模式</h3>
+          <div class="debug-actions">
+            <button id="debugExport" class="btn btn-sm">1. 调试导出接口</button>
+            <button id="debugMerge" class="btn btn-sm">2. 调试 JSON 合并</button>
+            <button id="debugCreate" class="btn btn-sm">3. 调试新建接口</button>
+          </div>
+          <div id="debugOutput" class="debug-output"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab: 设置 -->
+    <section class="tab-panel" data-panel="settings">
+      <div class="card">
+        <h2>偏好设置</h2>
+        <label class="setting">
+          <span>示例选项</span>
+          <input id="sampleOption" type="checkbox" />
+        </label>
+        <label class="setting">
+          <span>启用调试模式</span>
+          <input id="debugMode" type="checkbox" />
+        </label>
+        <label class="setting">
+          <span class="debug-detail-label" id="debugDetailLabel">调试输出模式</span>
+          <select id="debugDetailLevel" disabled>
+            <option value="simple">精简</option>
+            <option value="detailed">详细</option>
+          </select>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>aPaaS Tools v1.0.0</span>
+  </footer>
+
+  <script src="index.js"></script>
+</body>
+</html>
