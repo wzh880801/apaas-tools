@@ -9,7 +9,8 @@
     "tabs",
     "storage",
     "cookies",
-    "webRequest"
+    "webRequest",
+    "scripting"
   ],
   "host_permissions": [
     "*://*.aedev.feishuapp.cn/*"

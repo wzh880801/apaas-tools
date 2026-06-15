@@ -14,10 +14,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
+  // ===== Toast 提示 =====
+  const toastContainer = document.getElementById('toastContainer');
+
+  function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-8px)';
+      toast.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      setTimeout(() => toast.remove(), 200);
+    }, duration);
+  }
+
   // 恢复上次选中的 tab
   const stored = await chrome.storage.local.get([
     ACTIVE_TAB_KEY,
-    'sampleOption',
     'debugMode',
     'debugDetailLevel',
   ]);
@@ -383,15 +399,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response?.ok) {
         const items = response.data?.data?.items || [];
         renderObjectList(items);
+        showToast(`已加载 ${items.length} 个对象`, 'success');
       } else {
         objectListEl.innerHTML = `<li class="object-empty">加载失败: ${escapeHtml(
           response?.error || '未知错误'
         )}</li>`;
         updateObjectCount();
+        showToast(`加载失败: ${response?.error || '未知错误'}`, 'error');
       }
     } catch (error) {
       objectListEl.innerHTML = `<li class="object-empty">加载失败: ${escapeHtml(error.message)}</li>`;
       updateObjectCount();
+      showToast(`加载失败: ${error.message}`, 'error');
     } finally {
       loadObjectsBtn.textContent = '加载对象列表';
       loadObjectsBtn.disabled = false;
@@ -602,13 +621,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response?.ok) {
         const createdObject = response.data?.data?.object;
         const apiAlias = createdObject?.api_alias || createdObject?.api_name;
-        actionResultTextEl.textContent = `创建成功: ${apiAlias} (ID: ${createdObject?.id})`;
+        const message = `创建成功: ${apiAlias} (ID: ${createdObject?.id})`;
+        actionResultTextEl.textContent = message;
+        showToast(message, 'success', 5000);
       } else {
-        actionResultTextEl.textContent = `创建失败: ${response?.error || '未知错误'}`;
+        const message = `创建失败: ${response?.error || '未知错误'}`;
+        actionResultTextEl.textContent = message;
+        showToast(message, 'error', 5000);
       }
       actionResultEl.classList.remove('hidden');
     } catch (error) {
-      actionResultTextEl.textContent = `创建失败: ${error.message}`;
+      const message = `创建失败: ${error.message}`;
+      actionResultTextEl.textContent = message;
+      showToast(message, 'error', 5000);
       actionResultEl.classList.remove('hidden');
     } finally {
       mergeCreateObjectBtn.textContent = '合并为新对象';
@@ -691,12 +716,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateDebugPanel();
 
   // ===== 设置 Tab =====
-  const sampleOptionEl = document.getElementById('sampleOption');
-  sampleOptionEl.checked = stored.sampleOption ?? false;
-  sampleOptionEl.addEventListener('change', () => {
-    chrome.storage.local.set({ sampleOption: sampleOptionEl.checked });
-  });
-
   const debugModeEl = document.getElementById('debugMode');
   const debugDetailLevelEl = document.getElementById('debugDetailLevel');
 

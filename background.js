@@ -112,19 +112,78 @@ function generateTraceparent() {
 }
 
 /**
+ * 从当前活动标签页的 storage 中读取 x-kunlun-token
+ */
+async function fetchTokenFromActiveTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !tab.url?.includes('aedev.feishuapp.cn')) {
+      return '';
+    }
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const keys = ['x-kunlun-token', 'X-Kunlun-Token', 'X-KUNLUN-TOKEN'];
+        for (const key of keys) {
+          const v = window.localStorage.getItem(key) || window.sessionStorage.getItem(key);
+          if (v) return v;
+        }
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && /kunlun/i.test(key)) {
+            const v = window.localStorage.getItem(key);
+            if (v) return v;
+          }
+        }
+        for (let i = 0; i < window.sessionStorage.length; i++) {
+          const key = window.sessionStorage.key(i);
+          if (key && /kunlun/i.test(key)) {
+            const v = window.sessionStorage.getItem(key);
+            if (v) return v;
+          }
+        }
+        return '';
+      },
+    });
+    return results?.[0]?.result || '';
+  } catch (error) {
+    console.error('[aPaaS Tools] 从活动标签页读取 token 失败:', error);
+    return '';
+  }
+}
+
+/**
  * 校验并获取认证信息
  */
 async function getAuthContext(referer) {
   const stored = await chrome.storage.local.get(AUTH_STORAGE_KEY);
-  const auth = stored[AUTH_STORAGE_KEY] || {};
+  let auth = stored[AUTH_STORAGE_KEY] || {};
+
+  // token 缺失时，尝试从当前活动标签页实时读取
   if (!auth.token) {
-    throw new Error('未获取到 x-kunlun-token，请先刷新认证信息');
+    const liveToken = await fetchTokenFromActiveTab();
+    if (liveToken) {
+      await saveAuthInfo('activeTab', { token: liveToken, url: referer });
+      auth = { ...auth, token: liveToken };
+    }
   }
 
+  if (!auth.token) {
+    throw new Error('未获取到 x-kunlun-token，请在目标页面刷新后重试');
+  }
+
+  // 使用 chrome.cookies API 获取完整 cookie（包含 HttpOnly）
   const cookieList = await chrome.cookies.getAll({ url: referer });
   const cookieString = cookieList.map((c) => `${c.name}=${c.value}`).join('; ');
   if (!cookieString) {
     throw new Error('未获取到 cookie，请确认已登录');
+  }
+
+  // 同时更新 storage 中的 cookie，保持最新
+  if (auth.cookie !== cookieString) {
+    await saveAuthInfo('cookiesApi', { cookie: cookieString });
+    auth.cookie = cookieString;
   }
 
   return { auth, cookieString };

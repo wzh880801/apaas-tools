@@ -8,6 +8,10 @@
   --primary-hover: #1a6fd6;
   --tab-hover-bg: #eef1f4;
   --tab-active-bg: #ffffff;
+  --success-color: #1d5f2a;
+  --success-bg: #e6f4ea;
+  --error-color: #d1242f;
+  --error-bg: #ffebe9;
 }
 
 * {
@@ -503,4 +507,50 @@ body {
   margin-left: 6px;
   font-size: 11px;
   color: #d1242f;
+}
+.toast-container {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-color);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(31, 35, 40, 0.12);
+  pointer-events: auto;
+  animation: toast-in 0.2s ease;
+}
+
+.toast.success {
+  color: var(--success-color);
+  background-color: var(--success-bg);
+  border-color: #b7dcb8;
+}
+
+.toast.error {
+  color: var(--error-color);
+  background-color: var(--error-bg);
+  border-color: #f0b4b4;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
