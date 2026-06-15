@@ -160,6 +160,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const objectListEl = document.getElementById('objectList');
   const actionResultEl = document.getElementById('actionResult');
   const actionResultTextEl = document.getElementById('actionResultText');
+  let actionResultTimer = null;
+
+  function showActionResult(text, autoHideMs = 10000) {
+    actionResultTextEl.textContent = text;
+    actionResultEl.classList.remove('hidden');
+    if (actionResultTimer) {
+      clearTimeout(actionResultTimer);
+    }
+    if (autoHideMs > 0) {
+      actionResultTimer = setTimeout(() => {
+        actionResultEl.classList.add('hidden');
+      }, autoHideMs);
+    }
+  }
+
   const debugPanel = document.getElementById('debugPanel');
   const debugOutput = document.getElementById('debugOutput');
   const debugExportBtn = document.getElementById('debugExport');
@@ -174,6 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentOrigin = '';
   let currentReferer = '';
   let debugObjectJsonList = [];
+  let selectionOrder = [];
 
   function updateDebugPanel() {
     if (stored.debugMode) {
@@ -385,6 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadObjectsBtn.textContent = '加载中...';
     loadObjectsBtn.disabled = true;
     actionResultEl.classList.add('hidden');
+    selectionOrder = [];
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'FETCH_OBJECTS',
@@ -399,18 +416,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response?.ok) {
         const items = response.data?.data?.items || [];
         renderObjectList(items);
-        showToast(`已加载 ${items.length} 个对象`, 'success');
+        showToast(`已加载 ${items.length} 个对象`, 'success', 10000);
       } else {
         objectListEl.innerHTML = `<li class="object-empty">加载失败: ${escapeHtml(
           response?.error || '未知错误'
         )}</li>`;
         updateObjectCount();
-        showToast(`加载失败: ${response?.error || '未知错误'}`, 'error');
+        showToast(`加载失败: ${response?.error || '未知错误'}`, 'error', 10000);
       }
     } catch (error) {
       objectListEl.innerHTML = `<li class="object-empty">加载失败: ${escapeHtml(error.message)}</li>`;
       updateObjectCount();
-      showToast(`加载失败: ${error.message}`, 'error');
+      showToast(`加载失败: ${error.message}`, 'error', 10000);
     } finally {
       loadObjectsBtn.textContent = '加载对象列表';
       loadObjectsBtn.disabled = false;
@@ -422,16 +439,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   selectAllObjectsEl.addEventListener('change', () => {
-    objectListEl
-      .querySelectorAll('.object-item input[type="checkbox"]')
-      .forEach((cb) => {
-        cb.checked = selectAllObjectsEl.checked;
+    const visibleCheckboxes = objectListEl.querySelectorAll(
+      '.object-item input[type="checkbox"]:not(:disabled)'
+    );
+    if (selectAllObjectsEl.checked) {
+      visibleCheckboxes.forEach((cb) => {
+        if (!cb.checked) {
+          cb.checked = true;
+          if (!selectionOrder.includes(cb.value)) {
+            selectionOrder.push(cb.value);
+          }
+        }
       });
+    } else {
+      visibleCheckboxes.forEach((cb) => {
+        cb.checked = false;
+      });
+      selectionOrder = [];
+    }
     updateObjectCount();
   });
 
   objectListEl.addEventListener('change', (event) => {
     if (event.target.matches('input[type="checkbox"]')) {
+      const cb = event.target;
+      if (cb.checked) {
+        if (!selectionOrder.includes(cb.value)) {
+          selectionOrder.push(cb.value);
+        }
+      } else {
+        selectionOrder = selectionOrder.filter((v) => v !== cb.value);
+      }
       updateObjectCount();
       updateSelectAllState();
     }
@@ -578,15 +616,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function exportAndMergeSelected() {
-    const selected = Array.from(
+    const checked = Array.from(
       objectListEl.querySelectorAll('.object-item input[type="checkbox"]:checked')
     ).map((cb) => cb.value);
 
-    if (selected.length < 2) {
+    if (checked.length < 2) {
       throw new Error('请至少选择 2 个对象进行合并');
     }
 
-    const results = await Promise.all(selected.map((apiAlias) => exportObject(apiAlias)));
+    // 按选择顺序排序，第一个被选中的作为主对象
+    const selected = checked.sort(
+      (a, b) => selectionOrder.indexOf(a) - selectionOrder.indexOf(b)
+    );
+
+    const results = await Promise.all(selected.map((apiName) => exportObject(apiName)));
     const failed = results.find((r) => !r?.ok);
     if (failed) {
       throw new Error(failed.error || '导出对象失败');
@@ -622,19 +665,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const createdObject = response.data?.data?.object;
         const apiAlias = createdObject?.api_alias || createdObject?.api_name;
         const message = `创建成功: ${apiAlias} (ID: ${createdObject?.id})`;
-        actionResultTextEl.textContent = message;
-        showToast(message, 'success', 5000);
+        showActionResult(message);
+        showToast(message, 'success', 10000);
       } else {
         const message = `创建失败: ${response?.error || '未知错误'}`;
-        actionResultTextEl.textContent = message;
-        showToast(message, 'error', 5000);
+        showActionResult(message);
+        showToast(message, 'error', 10000);
       }
-      actionResultEl.classList.remove('hidden');
     } catch (error) {
       const message = `创建失败: ${error.message}`;
-      actionResultTextEl.textContent = message;
-      showToast(message, 'error', 5000);
-      actionResultEl.classList.remove('hidden');
+      showActionResult(message);
+      showToast(message, 'error', 10000);
     } finally {
       mergeCreateObjectBtn.textContent = '合并为新对象';
       updateObjectCount();
@@ -643,14 +684,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ===== 调试按钮 =====
   debugExportBtn.addEventListener('click', async () => {
-    const selected = Array.from(
+    const checked = Array.from(
       objectListEl.querySelectorAll('.object-item input[type="checkbox"]:checked')
     ).map((cb) => cb.value);
 
-    if (!selected.length) {
+    if (!checked.length) {
       logDebug('导出调试', '请先选择至少一个对象');
       return;
     }
+
+    const selected = checked.sort(
+      (a, b) => selectionOrder.indexOf(a) - selectionOrder.indexOf(b)
+    );
 
     debugExportBtn.textContent = '导出中...';
     debugExportBtn.disabled = true;
